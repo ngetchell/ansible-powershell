@@ -1,5 +1,5 @@
 galaxy_info:
-  author: Nicholas M. Getchell
+  author: "Nicholas M. Getchell"
   description: PowerShell installation
   company: 
 
@@ -31,7 +31,7 @@ galaxy_info:
   # the ones that apply to your role. If you don't see your
   # platform on this list, let us know and we'll get it added!
   #
-  #platforms:
+  platforms:
   #- name: OpenBSD
   #  versions:
   #  - all
