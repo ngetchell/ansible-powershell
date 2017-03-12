@@ -1,11 +1,12 @@
 ---
 
-- name: configure microsoft repository
-  get_url:
-    url: "https://packages.microsoft.com/config/rhel/7/prod.repo"
-    dest: /etc/yum.repos.d/microsoft.repo
-  when:
-    - ansible_pkg_mgr == 'yum'
+- name: set microsoft repo
+  yum_repository:
+    name: powershell
+    file: powershell
+    description: microsoft powershell
+    gpgkey: https://packages.microsoft.com/keys/microsoft.asc
+    baseurl: https://packages.microsoft.com/yumrepos/microsoft-rhel7.3-prod/
 
 - name: install powershell
   yum:
