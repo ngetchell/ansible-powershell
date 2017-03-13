@@ -18,3 +18,11 @@
   apt:
     name: powershell
     state: latest
+
+- name: omi and remoting
+  yum:
+    name: "{{ item }}"
+    state: present
+  with_items:
+  - omi
+  - omi-psrp-server
