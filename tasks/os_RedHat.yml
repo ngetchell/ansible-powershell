@@ -14,3 +14,10 @@
     state: latest
   when:
     - ansible_pkg_mgr == 'yum'
+
+- name: install omi and remoting
+  yum:
+    name: "{{ item }}"
+  with_items:
+  - omi
+  - omi-psrp-server
