@@ -21,3 +21,5 @@
   with_items:
   - omi
   - omi-psrp-server
+  when:
+    - ansible_pkg_mgr == 'yum'
