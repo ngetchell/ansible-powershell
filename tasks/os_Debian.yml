@@ -14,6 +14,13 @@
     state: present
     update_cache: yes
 
+- name: add repository
+  apt_repository:
+    repo: "deb https://packages.microsoft.com/ubuntu/{{ansible_distribution_version}}/prod {{ ansible_distribution_release }} main"
+    filename: microsoft.powershell
+    state: remove
+    update_cache: yes    
+
 - name: install powershell
   apt:
     name: powershell
