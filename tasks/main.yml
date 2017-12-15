@@ -1,1 +1,1 @@
-- include: "os_{{ ansible_os_family }}.yml"
+- include_tasks: "os_{{ ansible_os_family }}.yml"
