@@ -1,0 +1,128 @@
+---
+driver:
+  name: docker
+  use_sudo: false
+
+provisioner:
+  # name of the host
+  hosts: test-kitchen
+  # use an ansible playbook to provision our server
+  name: ansible_playbook
+  ansible_verbose: true
+  ansible_verbosity: 4
+  require_ansible_repo: false
+  require_ansible_omnibus: true
+  ansible_version: 2.4.2
+  require_chef_for_busser: false
+  sudo: True
+  sudo_command: sudo -E -H
+  idempotency_test: true
+  extra_vars:
+    pwsh_install_omi: True
+    pwsh_install_azure_cli: True
+
+
+transport:
+  max_ssh_sessions: 6
+
+platforms:
+  - name: ubuntu-rolling
+    driver_config:
+      run_command: /lib/systemd/systemd
+      dockerfile: .docker/ubuntu/rolling/Dockerfile
+      platform: ubuntu
+      instance_name: test-role-ansible-powershell-ubuntu-rolling
+      cap_add:
+        - SYS_ADMIN
+      volume:
+        - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      run_options:
+        tmpfs:
+          - /run
+          - /run/lock
+
+  - name: ubuntu-stable
+    driver_config:
+      run_command: /lib/systemd/systemd
+      dockerfile: .docker/ubuntu/stable/Dockerfile
+      platform: ubuntu
+      instance_name: test-role-ansible-powershell-ubuntu-stable
+      cap_add:
+        - SYS_ADMIN
+      volume:
+        - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      run_options:
+        tmpfs:
+          - /run
+          - /run/lock
+
+  - name: debian-stable
+    driver_config:
+      run_command: /lib/systemd/systemd
+      dockerfile: .docker/debian/stable/Dockerfile
+      platform: debian
+      instance_name: test-role-ansible-powershell-debian-stable
+      cap_add:
+        - SYS_ADMIN
+      volume:
+        - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      run_options:
+        tmpfs:
+          - /run
+          - /run/lock
+
+  - name: debian-oldstable
+    driver_config:
+      run_command: /lib/systemd/systemd
+      dockerfile: .docker/debian/oldstable/Dockerfile
+      platform: debian
+      instance_name: test-role-ansible-powershell-debian-oldstable
+      cap_add:
+        - SYS_ADMIN
+      volume:
+        - /sys/fs/cgroup:/sys/fs/cgroup:ro
+      run_options:
+        tmpfs:
+          - /run
+          - /run/lock
+
+#  - name: fedora-latest
+#    driver_config:
+#      run_command: /lib/systemd/systemd
+#      dockerfile: .docker/fedora/latest/Dockerfile
+#      platform: fedora
+#      instance_name: test-role-ansible-powershell-fedora-latest
+#      cap_add:
+#        - SYS_ADMIN
+#      volume:
+#        - /sys/fs/cgroup:/sys/fs/cgroup:ro
+#      run_options:
+#        tmpfs:
+#          - /run
+#          - /run/lock
+#
+#  - name: opensuse-tumbleweed
+#    driver_config:
+#      run_command: /usr/lib/systemd/systemd
+#      dockerfile: .docker/opensuse/tumbleweed/Dockerfile
+#      platform: opensuse
+#      instance_name: test-role-ansible-powershell-opensuse-tumbleweed
+#      cap_add:
+#        - SYS_ADMIN
+#      volume:
+#        - /sys/fs/cgroup:/sys/fs/cgroup:ro
+#      run_options:
+#        tmpfs:
+#          - /run
+#          - /run/lock
+
+verifier:
+  name: serverspec
+  sudo_path: True
+
+suites:
+  # suites found at /test/integration/$test-name
+  - name: default
+    verifier:
+      patterns:
+        - roles/ansible-powershell/test/integration/default/serverspec/*_spec.rb

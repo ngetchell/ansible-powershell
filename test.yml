@@ -1,0 +1,6 @@
+---
+- hosts: localhost
+  tasks:
+    - name: register omi releases
+      shell: curl -sL https://github.com/Microsoft/omi/releases | awk -v ssl_version=ssl_100 '/<a href=(.*deb).*/{if ($0 ~ ssl_version) { match($0,"<a href=.(.*deb).*",matches); print matches[1] }}'
+      register: omi_releases
