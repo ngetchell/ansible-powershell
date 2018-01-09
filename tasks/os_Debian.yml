@@ -29,9 +29,10 @@
     - gawk
     - apt-transport-https
 
-- name: set gpg key
+- name: install powershell gpg key
   apt_key:
-    url: "https://packages.microsoft.com/keys/microsoft.asc"
+    keyserver: packages.microsoft.com
+    id: BC528686B50D79E339D3721CEB3E94ADBE1229CF
     state: present
 
 - name: install azure-cli gpg key
