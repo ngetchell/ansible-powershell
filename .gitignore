@@ -1,2 +1,14 @@
 ansible.cfg
 *.retry
+
+# Bundler
+.bundle
+vendor
+Gemfile.lock
+
+# Ruby
+.ruby-version
+
+# Test-kitchen
+.kitchen/
+.kitchen.local.yml

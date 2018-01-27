@@ -2,34 +2,214 @@
 # tasks file for powershell
 
 
-- name: set gpg key
+- name: Set repo url
+  set_fact:
+    pwsh_repo: "{{ item.url }}"
+  when:
+    - ansible_lsb.codename == item.codename
+  with_items:
+    - codename: artful
+      url: https://packages.microsoft.com/ubuntu/17.04/prod zesty
+    - codename: zesty
+      url: https://packages.microsoft.com/ubuntu/17.04/prod zesty
+    - codename: xenial
+      url: https://packages.microsoft.com/ubuntu/16.04/prod xenial
+    - codename: trusty
+      url: https://packages.microsoft.com/ubuntu/14.04/prod trusty
+    - codename: jessie
+      url: https://packages.microsoft.com/repos/microsoft-debian-jessie-prod jessie
+    - codename: stretch
+      url: https://packages.microsoft.com/repos/microsoft-debian-stretch-prod stretch
+
+- name: install pre-requistes
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - gawk
+    - apt-transport-https
+
+- name: install powershell gpg key
   apt_key:
-    url: "https://packages.microsoft.com/keys/microsoft.asc"
+    keyserver: packages.microsoft.com
+    id: BC528686B50D79E339D3721CEB3E94ADBE1229CF
     state: present
 
-- name: add repository
+- name: install azure-cli gpg key
+  apt_key:
+    keyserver: packages.microsoft.com
+    id: 52E16F86FEE04B979B07E28DB02C46DF417A0893
+    state: present
+  when:
+    - pwsh_install_azure_cli|default(false)
+
+- name: add pwsh repository
   apt_repository:
-    repo: "deb [arch=amd64] https://packages.microsoft.com/ubuntu/{{ansible_distribution_version}}/prod {{ ansible_distribution_release }} main"
+    repo: "deb [arch=amd64] {{ pwsh_repo }} main"
     filename: microsoft.powershell
     state: present
     update_cache: yes
 
-- name: add repository
+- name: remove outdated pwsh repository
   apt_repository:
-    repo: "deb https://packages.microsoft.com/ubuntu/{{ansible_distribution_version}}/prod {{ ansible_distribution_release }} main"
+    repo: "deb {{ pwsh_repo }} main"
     filename: microsoft.powershell
     state: absent
-    update_cache: yes    
+    update_cache: yes
+
+- name: add azure-cli repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ wheezy main"
+    filename: microsoft.azure-cli
+    state: present
+    update_cache: yes
+  when:
+    - pwsh_install_azure_cli|default(false)
 
 - name: install powershell
   apt:
     name: powershell
     state: latest
 
-- name: omi and remoting
+- name: install azure-cli
+  apt:
+    name: azure-cli
+    state: latest
+  when:
+    - pwsh_install_azure_cli|default(false)
+
+- name: register azure modules existence
+  shell: pwsh -c "Get-Module -ListAvailable" | awk 'BEGIN{cnt=0} /Azure/{ cnt++ } END{if (cnt >= 1) {print "1"} else {print "0"}}'
+  register: azure_pwsh_module
+  changed_when: false
+
+- name: update pwsh help
+  command: "pwsh -noni -c 'Update-Help'"
+  register: pwsh_update
+  changed_when:
+    - pwsh_update.stdout != ""
+
+- name: install pwsh azure modules
+  command: "{{ item }}"
+  with_items:
+    - "pwsh -noni -c 'Install-Module -Force AzureRM.Netcore'"
+    - "pwsh -noni -c 'Import-Module AzureRM.Netcore'"
+    - "pwsh -noni -c 'Import-Module AzureRM.Profile.Netcore'"
+  when:
+    - azure_pwsh_module.stdout == "0"
+    - pwsh_install_azure_cli|default(false)
+
+- name: register openssl version
+  shell: openssl version | awk '{ version=$2; gsub(/[A-z]/,"",version); print version }'
+  register: openssl_version
+  changed_when: false
+
+- debug:
+    var: openssl_version
+
+- name: set omi ssl version to 1.1.0
+  set_fact:
+    omi_ssl_version: "ssl_110"
+  when:
+    - openssl_version.stdout | version_compare('1.1.0','>=')
+
+- name: set omi ssl version to 1.0.0
+  set_fact:
+    omi_ssl_version: "ssl_100"
+  when:
+    - openssl_version.stdout | version_compare('1.0.0','>=')
+    - openssl_version.stdout | version_compare('1.1.0','<')
+
+- name: set omi ssl version to 0.9.8
+  set_fact:
+    omi_ssl_version: "ssl_098"
+  when:
+    - openssl_version.stdout | version_compare('1.0.0','<')
+
+- name: Check if omi is installed
+  command: warn=no dpkg-query -s omi
+  register: omi_is_installed
+  ignore_errors: true
+  changed_when: false
+
+- name: register omi releases
+  shell: curl -sL https://github.com/Microsoft/omi/releases | gawk -v ssl_version={{ omi_ssl_version }} '/<a href=(.*deb).*/{if ($0 ~ ssl_version) { match($0,"<a href=.(.*deb).*",matches); print matches[1] }}'
+  register: omi_releases
+  when:
+    - pwsh_install_omi|default(false)
+    - ansible_lsb.codename != "xenial"
+    - omi_is_installed.rc == 1
+
+- name: download latest omi release
+  get_url:
+    url: "https://github.com{{ omi_releases.stdout_lines[0] }}"
+    dest: /tmp/omi.deb
+  register: omi_download
+  when:
+    - pwsh_install_omi|default(false)
+    - omi_is_installed.rc == 1
+    - ansible_lsb.codename != "xenial"
+
+- name: install omi
+  apt:
+    deb: "/tmp/omi.deb"
+  when:
+    - pwsh_install_omi|default(false)
+    - omi_is_installed.rc == 1
+    - omi_download.changed
+    - ansible_lsb.codename != "xenial"
+
+- name: clean omi download
+  file:
+    path: /tmp/omi.deb
+    state: absent
+
+- name: Check if omi psrp server is installed
+  command: warn=no dpkg-query -s omi-psrp-server
+  register: omi_psrp_server_is_installed
+  ignore_errors: true
+  changed_when: false
+
+- name: register omi psrp server releases
+  shell: curl -sL https://github.com/PowerShell/psl-omi-provider/releases | gawk '/<a href=(.*deb).*/{ match($0,"<a href=\"(.*deb).*",matches); print matches[1] }'
+  register: omi_psrp_server_releases
+  changed_when: false
+  when:
+    - pwsh_install_omi|default(false)
+    - ansible_lsb.codename != "xenial"
+    - omi_psrp_server_is_installed.rc == 1
+
+- name: download latest omi psrp server releases
+  get_url:
+    url: "https://github.com{{ omi_psrp_server_releases.stdout_lines[0] }}"
+    dest: /tmp/omi_psrp_server.deb
+  register: omi_psrp_server_download
+  when:
+    - pwsh_install_omi|default(false)
+    - omi_psrp_server_is_installed.rc == 1
+    - ansible_lsb.codename != "xenial"
+
+- name: install omi psrp server
+  apt:
+    deb: "/tmp/omi_psrp_server.deb"
+  when:
+    - pwsh_install_omi|default(false)
+    - omi_psrp_server_is_installed.rc == 1
+    - omi_psrp_server_download.changed
+    - ansible_lsb.codename != "xenial"
+
+- name: clean omi psrp server download
+  file:
+    path: /tmp/omi_psrp_server.deb
+    state: absent
+
+- name: install pwsh omi and remoting
   apt:
     name: "{{ item }}"
     state: present
   with_items:
-  - omi
-  - omi-psrp-server
+    - omi
+    - omi-psrp-server
+  when:
+    - pwsh_install_omi|default(false)
+    - ansible_lsb.codename == "xenial"
